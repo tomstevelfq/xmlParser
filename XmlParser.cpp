@@ -17,12 +17,17 @@ typedef string::const_iterator cstritera;
 
 class XMLParse;
 class XMLTree;
-class preProcess;
-class preProcess{
+class PreProcess;
+class PreProcess{
     public:
         void delblank(cstritera& sta){
             while(*sta==' '||*sta=='\n'){
                 sta++;
+            }
+        }
+        void rdelblank(cstritera& end){
+            while(*end==' '||*end=='\n'){
+                end--;
             }
         }
         cstritera getPos(cstritera& sta,cstritera end,char c){
@@ -34,9 +39,78 @@ class preProcess{
             auto it=find(sta,end,c);
             return it;
         }
+        void getTagAttr(cstritera& sta,cstritera end,string& tem){
+            while(true){
+                delblank(sta);
+                auto it=getPos_(sta,end,'=');
+                if(it==end){
+                    sta=++it;
+                    break;
+                }
+                string attr(sta,it);
+                tem+=" "+attr;
+                sta=++it;
+                delblank(sta);
+                it=getPos_(sta,end,'"');
+                if(it==end){
+                    ERROR;
+                }
+                sta=++it;
+                it=getPos_(sta,end,'"');
+                if(it==end){
+                    ERROR;
+                }
+                string val(sta,it);
+                tem+="=\""+val+"\"";
+                sta=++it;
+            } 
+        }
         string process(const string& str){
             string ret;
-
+            auto sta=str.begin();
+            delblank(sta);
+            auto end=str.end()-1;
+            rdelblank(end);
+            end++;
+            while(sta!=end){
+                delblank(sta);
+                if(*sta=='<'){
+                    sta++;
+                    delblank(sta);
+                    ret+="<";
+                    if(*(sta)!='/'){
+                        auto tem1=getPos_(sta,end,'>');
+                        auto tem2=getPos_(sta,tem1,' ');
+                        ret+=string(sta,tem2);
+                        sta=tem2;
+                        delblank(sta);
+                        if(sta==tem1){
+                            sta++;
+                        }else{
+                            getTagAttr(sta,tem1,ret);
+                        }
+                        ret+=">";
+                    }else{
+                        sta++;
+                        delblank(sta);
+                        auto tem1=getPos_(sta,end,'>');
+                        auto tem2=getPos_(sta,tem1,' ');
+                        ret+="/"+string(sta,tem2)+">";
+                        sta=tem1+1;
+                    }
+                }else{
+                    auto tem=sta;
+                    auto tem2=getPos_(sta,end,'<');
+                    sta=tem2;
+                    sta--;
+                    rdelblank(sta);
+                    sta++;
+                    ret+=string(tem,sta);
+                    sta=tem2;
+                }
+            }
+            cout<<ret<<endl;
+            return ret;
         }
 };
 class XML{
@@ -204,17 +278,15 @@ class XMLParse{
             auto sta=xmlstr.begin();
             auto end=xmlstr.end();
             while(sta!=xmlstr.end()){
-                delblank(sta);
                 CHECK(sta);
                 //cout<<*sta<<endl;
                 if(*sta=='<'){
-                    delblank(sta);
                     if(*(sta+1)!='/'){
                         string tagStr=getTag(sta,end);
-                        delblank(sta);
                         CHECK(sta);
-                        //cout<<string(sta,xmlstr.end())<<endl;
-                        if(*sta=='<'){
+                        auto it=sta+1;
+                        delblank(it);
+                        if(*sta=='<'&&*it!='/'){
                             shared_ptr<XMLTree> xmlptr(new XMLTree(out));
                             getTagAttr(tagStr,*xmlptr);
                             if(!stk.empty()){
@@ -338,7 +410,9 @@ int main(){
     string str;
     ifs.unsetf(ios::skipws);
     copy(istream_iterator<char>(ifs),istream_iterator<char>(),back_insert_iterator<string>(str));
-    //cout<<str<<endl;
+    PreProcess pre;
+    str=pre.process(str);
+    cout<<str<<endl;
     ofstream ofs("helo1.xml");
     XMLTree xml(ofs);
     xml.parseStr(str);

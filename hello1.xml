@@ -1,0 +1,21 @@
+<mapper namespace="com.mdc.mapper.Mapper"    >
+    <  resultMap id="BaseResultMap" type="Sch"   >
+        <  result column="id" property="Id"  ></result  >
+        <result column="Code" property="Code" ></result>
+    </resultMap >
+ 
+    <select id="getSchCodesByAoiIds" resultMap="BaseResultMap">
+        <where>
+            <if test="cityCode != null and cityCode != ''">
+                and city_code=#{cityCode}
+            </if>
+            <if test="Ids != null">
+                <foreach item="item" index="index" collection="Ids" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+ 
+        </where>
+    </select>
+ 
+</mapper>
