@@ -26,6 +26,10 @@ class PreProcess{
         cstritera getPos_(cstritera sta,cstritera end,char c);
         void getTagAttr(cstritera& sta,cstritera end,string& tem);
         string process(const string& str);
+        void processBeginTag(string& ret,cstritera& sta,cstritera end);
+        void processEndTag(string& ret,cstritera& sta,cstritera end);
+        void processTag(string& ret,cstritera& sta,cstritera end);
+        void processText(string& ret,cstritera& sta,cstritera end);
 };
 class XML{
     public:
@@ -127,28 +131,63 @@ cstritera PreProcess::getPos_(cstritera sta,cstritera end,char c){
 void PreProcess::getTagAttr(cstritera& sta,cstritera end,string& tem){
     while(true){
         delblank(sta);
-        auto it=getPos_(sta,end,'=');
-        if(it==end){
+        auto it=getPos_(sta,end,' ');
+        if(string(sta,it)=="/"){
+            tem+="/";
+            sta=it;
+            continue;
+        }else if(it==end){
+            if(string(sta,it)!=""){
+                tem+=" "+string(sta,it);
+            }
             sta=++it;
             break;
         }
-        string attr(sta,it);
-        tem+=" "+attr;
-        sta=++it;
-        delblank(sta);
-        it=getPos_(sta,end,'"');
-        if(it==end){
-            ERROR;
-        }
-        sta=++it;
-        it=getPos_(sta,end,'"');
-        if(it==end){
-            ERROR;
-        }
-        string val(sta,it);
-        tem+="=\""+val+"\"";
+        string str(sta,it);
+        tem+=" "+str;
         sta=++it;
     } 
+}
+void PreProcess::processBeginTag(string& ret,cstritera& sta,cstritera end){
+    auto tem1=getPos_(sta,end,'>');
+    auto tem2=getPos_(sta,tem1,' ');
+    ret+=string(sta,tem2);
+    sta=tem2;
+    delblank(sta);
+    if(sta==tem1){
+        sta++;
+    }else{
+        getTagAttr(sta,tem1,ret);
+    }
+    ret+=">";
+}
+void PreProcess::processEndTag(string& ret,cstritera& sta,cstritera end){
+    sta++;
+    delblank(sta);
+    auto tem1=getPos_(sta,end,'>');
+    auto tem2=getPos_(sta,tem1,' ');
+    ret+="/"+string(sta,tem2)+">";
+    sta=tem1+1;
+}
+void PreProcess::processText(string& ret,cstritera& sta,cstritera end){
+    auto tem=sta;
+    auto tem2=getPos_(sta,end,'<');
+    sta=tem2;
+    sta--;
+    rdelblank(sta);
+    sta++;
+    ret+=string(tem,sta);
+    sta=tem2;
+}
+void PreProcess::processTag(string& ret,cstritera& sta,cstritera end){
+    sta++;
+    delblank(sta);
+    ret+="<";
+    if(*(sta)!='/'){
+        processBeginTag(ret,sta,end);
+    }else{
+        processEndTag(ret,sta,end);
+    }
 }
 string PreProcess::process(const string& str){
     string ret;
@@ -160,45 +199,12 @@ string PreProcess::process(const string& str){
     while(sta!=end){
         delblank(sta);
         if(*sta=='<'){
-            sta++;
-            delblank(sta);
-            ret+="<";
-            if(*(sta)!='/'){
-                auto tem1=getPos_(sta,end,'>');
-                auto tem2=getPos_(sta,tem1,' ');
-                ret+=string(sta,tem2);
-                sta=tem2;
-                delblank(sta);
-                if(sta==tem1){
-                    sta++;
-                }else{
-                    getTagAttr(sta,tem1,ret);
-                    auto it=sta-2;
-                    rdelblank(it);
-                    if(*it=='/'){
-                        ret+="/";
-                    }
-                }
-                ret+=">";
-            }else{
-                sta++;
-                delblank(sta);
-                auto tem1=getPos_(sta,end,'>');
-                auto tem2=getPos_(sta,tem1,' ');
-                ret+="/"+string(sta,tem2)+">";
-                sta=tem1+1;
-            }
+            processTag(ret,sta,end);
         }else{
-            auto tem=sta;
-            auto tem2=getPos_(sta,end,'<');
-            sta=tem2;
-            sta--;
-            rdelblank(sta);
-            sta++;
-            ret+=string(tem,sta);
-            sta=tem2;
+            processText(ret,sta,end);
         }
     }
+    //cout<<ret<<endl;
     return ret;
 }
 
