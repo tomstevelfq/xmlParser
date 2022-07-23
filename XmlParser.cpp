@@ -81,8 +81,8 @@ class XMLTree:public XML{
         void writeFile();
         ~XMLTree(){
         }
-    private:
         vector<shared_ptr<XML>> children;
+    private:
         XMLParse* xmlparse;
         shared_ptr<XML> pdata;
 };
@@ -173,6 +173,11 @@ string PreProcess::process(const string& str){
                     sta++;
                 }else{
                     getTagAttr(sta,tem1,ret);
+                    auto it=sta-2;
+                    rdelblank(it);
+                    if(*it=='/'){
+                        ret+="/";
+                    }
                 }
                 ret+=">";
             }else{
@@ -364,42 +369,37 @@ void XMLParse::parseTextTag(const string& tagStr,ostream& out){
     }
     stk.push(xmlnode);
 }
+void XMLParse::popStk(){
+    if(stk.size()==1){
+        root=stk.top();
+    }
+    stk.pop();
+}
 shared_ptr<XML> XMLParse::parse(const string& xmlstr,ostream& out){
     auto sta=xmlstr.begin();
     auto end=xmlstr.end();
     while(sta!=xmlstr.end()){
-        CHECK(sta);
         if(*sta=='<'){
             if(*(sta+1)!='/'){
                 string tagStr=getTag(sta,end);
                 CHECK(sta);
                 auto it=sta+1;
-                if(*sta=='<'&&*it!='/'){
-                    if(*(tagStr.end()-2)!='/'){
+                if(*(tagStr.end()-2)=='/'){
+                    tagStr.erase(tagStr.end()-2,tagStr.end());
+                    tagStr+=">";
+                    parseTextTag(tagStr,out);
+                    popStk();
+                }else{
+                    if(*sta=='<'&&*it!='/'){
                         parseTreeTag(tagStr,out);
                     }else{
-                        tagStr.erase(tagStr.end()-2,tagStr.end());
-                        tagStr+=">";
-                        parseTreeTag(tagStr,out);
-                        if(stk.size()==1){
-                            root=stk.top();
-                            stk.pop();
-                            break;
-                        }
-                        stk.pop();
+                        parseTextTag(tagStr,out);
                     }
-                }else{
-                    parseTextTag(tagStr,out);
                 }
+                
             }else{
-                if(stk.size()==1){
-                    root=stk.top();
-                    stk.pop();
-                    break;
-                }
+                popStk();
                 getTag(sta,end);
-                CHECK(sta);
-                stk.pop();
             }                    
         }else{
             if(stk.empty()){
@@ -410,6 +410,7 @@ shared_ptr<XML> XMLParse::parse(const string& xmlstr,ostream& out){
             top->setText(text);
         }
     }
+    
     return root;
 }
 string XMLParse::getTag(cstritera& sta,cstritera end){
@@ -461,16 +462,16 @@ void XMLParse::getTagAttr(const string& s,XML& xml){
                 ERROR;
             }
             string val(sta,it);
-            sta=++it;
+            sta=it+2;
             xml.addAttr(attr,val);
         }
     } 
 }
 
 int main(){
-    ofstream ofs("helo1.xml");
+    ofstream ofs("C:\\Users\\tomst\\Desktop\\xmlParser\\helo1.xml");
     XMLTree xml(ofs);
-    xml.parseFile("hello1.xml");
+    xml.parseFile("C:\\Users\\tomst\\Desktop\\xmlParser\\hello1.xml");
     xml.writeFile();
     return 0;
 }
