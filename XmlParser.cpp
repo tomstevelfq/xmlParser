@@ -6,6 +6,7 @@
 #include<stack>
 #include<memory>
 #include<algorithm>
+#include<iterator>
 using namespace std;
 #define ERROR {cout<<"格式错误"<<endl;exit(0);}
 #define CHECK(it) {if(it==end)ERROR;}
@@ -16,12 +17,33 @@ typedef string::const_iterator cstritera;
 
 class XMLParse;
 class XMLTree;
+class preProcess;
+class preProcess{
+    public:
+        void delblank(cstritera& sta){
+            while(*sta==' '||*sta=='\n'){
+                sta++;
+            }
+        }
+        cstritera getPos(cstritera& sta,cstritera end,char c){
+            auto it=find(sta,end,c);
+            sta=it+1;
+            return it;
+        }
+        cstritera getPos_(cstritera sta,cstritera end,char c){
+            auto it=find(sta,end,c);
+            return it;
+        }
+        string process(const string& str){
+            string ret;
+
+        }
+};
 class XML{
     public:
-        XML(ostream& out):out(out){
-            cout<<"xmlout"<<endl;
-        }
+        XML(ostream& out):out(out){}
         virtual void writeMid()=0;
+        virtual void writeMid(const string& blank)=0;
         virtual void writeBegin(){
             out<<"<"+tagName;
             if(!attributes.empty()){
@@ -32,13 +54,23 @@ class XML{
             }
             out<<">"<<endl;
         }
-        virtual void writeEnd(){
+        void writeBegin(const string& blank){
+            out<<blank;
+            writeBegin();
+        }
+        virtual void writeEnd(const string& blank){
+            writeEnd();
+        }
+        void write(const string& blank){
+            writeBegin(blank);
+            writeMid(blank);
+            writeEnd(blank);
+        }
+        void writeEnd(){
             out<<"</"+tagName+">"<<endl;
         }
         void write(){
-            writeBegin();
-            writeMid();
-            writeEnd();
+            write("");
         };
         virtual void showMid()=0;
         string getTagName(){
@@ -89,6 +121,9 @@ class XMLNode:public XML{
         void writeMid(){
             out<<text;
         }
+        void writeMid(const string& blank){
+            out<<text;
+        }
         void writeBegin(){
             out<<"<"+getTagName();
             if(!attributes.empty()){
@@ -98,9 +133,6 @@ class XMLNode:public XML{
                 }
             }
             out<<">";
-        }
-        void writeEnd(){
-            out<<"</"+getTagName()+">"<<endl;
         }
         void showMid(){
             cout<<text<<endl;
@@ -113,13 +145,21 @@ class XMLNode:public XML{
 };
 class XMLTree:public XML{
     public:
-        XMLTree(ostream& out):XML(out){
-            cout<<"osfteram"<<endl;
-        }
+        XMLTree(ostream& out):XML(out){}
         void writeMid(){
             for(auto it:children){
                 it->write();
             }
+        }
+        void writeMid(const string& blank){
+            for(auto it:children){
+                it->write(blank+"   ");
+            }
+        }
+        using XML::writeEnd;
+        void writeEnd(const string& blank){
+            out<<blank;
+            writeEnd();
         }
         void parseStr(const string& str);
         void showMid(){
@@ -146,7 +186,7 @@ class XMLTree:public XML{
 class XMLParse{
     public:
         void delblank(cstritera& sta){
-            while(*sta==' '){
+            while(*sta==' '||*sta=='\n'){
                 sta++;
             }
         }
@@ -160,23 +200,25 @@ class XMLParse{
             return it;
         }
         shared_ptr<XML> parse(const string& xmlstr,ostream& out){
-            cout<<xmlstr<<endl;
+            //cout<<xmlstr<<endl;
             auto sta=xmlstr.begin();
             auto end=xmlstr.end();
             while(sta!=xmlstr.end()){
                 delblank(sta);
                 CHECK(sta);
+                //cout<<*sta<<endl;
                 if(*sta=='<'){
                     delblank(sta);
                     if(*(sta+1)!='/'){
                         string tagStr=getTag(sta,end);
                         delblank(sta);
                         CHECK(sta);
+                        //cout<<string(sta,xmlstr.end())<<endl;
                         if(*sta=='<'){
                             shared_ptr<XMLTree> xmlptr(new XMLTree(out));
                             getTagAttr(tagStr,*xmlptr);
                             if(!stk.empty()){
-                                if(typeid(stk.top())!=typeid(XMLTree)){
+                                if(typeid(*stk.top())!=typeid(XMLTree)){
                                     ERROR;
                                 }
                                 stk.top()->addChild(xmlptr);
@@ -225,7 +267,16 @@ class XMLParse{
             delblank(sta);
             auto sta_=sta;
             auto end_=getPos(sta,end,'<');
+            cout<<*end_<<endl;
             sta--;
+            end_--;
+            cout<<*end_<<endl;
+            cout<<(*end_==' '||*end_=='\n')<<endl;
+            while(*end_==' '||*end_=='\n'){
+                end_--;
+            }
+            end_++;
+            cout<<"'"+string(sta_,end_)+"'"<<endl;
             return string(sta_,end_);
         }
         void getTagAttr(const string& s,XML& xml){
@@ -280,7 +331,14 @@ void XMLTree::parseStr(const string& str){
 }
 
 int main(){
-    string str="<person><sex>female</sex><firstname>Anna</firstname><lastname>Smith</lastname></person>";
+    ifstream ifs("hello1.xml");
+    if(ifs.fail()){
+        ERROR;
+    }
+    string str;
+    ifs.unsetf(ios::skipws);
+    copy(istream_iterator<char>(ifs),istream_iterator<char>(),back_insert_iterator<string>(str));
+    //cout<<str<<endl;
     ofstream ofs("helo1.xml");
     XMLTree xml(ofs);
     xml.parseStr(str);
