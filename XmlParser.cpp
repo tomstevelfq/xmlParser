@@ -102,6 +102,8 @@ class XMLParse{
         string getTag(cstritera& sta,cstritera end);
         string getText(cstritera& sta,cstritera end);
         void getTagAttr(const string& s,XML& xml);
+        void parseSingleTag(string& tagStr,ostream& out);
+        void parseText(cstritera& sta,const string& xmlstr);
         void popStk();
     private:
         stack<shared_ptr<XML>> stk;
@@ -381,6 +383,20 @@ void XMLParse::popStk(){
     }
     stk.pop();
 }
+void XMLParse::parseSingleTag(string& tagStr,ostream& out){
+    tagStr.erase(tagStr.end()-2,tagStr.end());
+    tagStr+=">";
+    parseTextTag(tagStr,out);
+    popStk();
+}
+void XMLParse::parseText(cstritera& sta,const string& xmlstr){
+    if(stk.empty()){
+        ERROR;
+    }
+    auto top=stk.top();
+    string text=getText(sta,xmlstr.end());
+    top->setText(text);
+}
 shared_ptr<XML> XMLParse::parse(const string& xmlstr,ostream& out){
     auto sta=xmlstr.begin();
     auto end=xmlstr.end();
@@ -391,10 +407,7 @@ shared_ptr<XML> XMLParse::parse(const string& xmlstr,ostream& out){
                 CHECK(sta);
                 auto it=sta+1;
                 if(*(tagStr.end()-2)=='/'){
-                    tagStr.erase(tagStr.end()-2,tagStr.end());
-                    tagStr+=">";
-                    parseTextTag(tagStr,out);
-                    popStk();
+                    parseSingleTag(tagStr,out);
                 }else{
                     if(*sta=='<'&&*it!='/'){
                         parseTreeTag(tagStr,out);
@@ -408,15 +421,9 @@ shared_ptr<XML> XMLParse::parse(const string& xmlstr,ostream& out){
                 getTag(sta,end);
             }                    
         }else{
-            if(stk.empty()){
-                ERROR;
-            }
-            auto top=stk.top();
-            string text=getText(sta,xmlstr.end());
-            top->setText(text);
+            parseText(sta,xmlstr);
         }
     }
-    
     return root;
 }
 string XMLParse::getTag(cstritera& sta,cstritera end){
