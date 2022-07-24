@@ -1,0 +1,15 @@
+<Class ID="435325" name="class 4" number="48" teacher="liu">
+   <Student>
+      <name>34</name>
+      <age></age>
+      <age></age>
+      <Grade>78</Grade>
+   </Student>
+   <Student>
+      <age>72</age>
+      <Student>
+         <name>tom</name>
+         <age>47</age>
+      </Student>
+   </Student>
+</Class>
