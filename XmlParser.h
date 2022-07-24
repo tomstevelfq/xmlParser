@@ -165,7 +165,7 @@ cstritera PreProcess::getPos_(cstritera sta,cstritera end,char c){
 void PreProcess::getTagAttr(cstritera& sta,cstritera end,string& tem){
     while(true){
         delblank(sta);
-        auto it=getPos_(sta,end,' ');
+        auto it=min(getPos_(sta,end,' '),getPos_(sta,end,'\n'));
         if(string(sta,it)=="/"){
             tem+="/";
             sta=it;
@@ -184,7 +184,7 @@ void PreProcess::getTagAttr(cstritera& sta,cstritera end,string& tem){
 }
 void PreProcess::processBeginTag(string& ret,cstritera& sta,cstritera end){
     auto tem1=getPos_(sta,end,'>');
-    auto tem2=getPos_(sta,tem1,' ');
+    auto tem2=min(getPos_(sta,tem1,' '),getPos_(sta,tem1,'\n'));
     ret+=string(sta,tem2);
     sta=tem2;
     delblank(sta);
@@ -238,7 +238,6 @@ string PreProcess::process(const string& str){
             processText(ret,sta,end);
         }
     }
-    //cout<<ret<<endl;
     return ret;
 }
 

@@ -61,9 +61,10 @@ void testCreateXML(){
 }
 void toString(){
     divid();
-    XMLReader reader1;
-    reader1.parseFile("C:\\Users\\tomst\\Desktop\\xmlParser\\in.xml");
-    cout<<reader1.toString()<<endl;
+    ofstream ofs("C:\\Users\\tomst\\Desktop\\xmlParser\\out.xml");
+    XMLReader reader1(ofs);
+    reader1.parseFile("C:\\Users\\tomst\\Desktop\\xmlParser\\in3.xml");
+    reader1.write();
     divid();
 }
 void testTagAndAttribute(){
@@ -105,10 +106,10 @@ void testTagAndAttribute(){
 }
 
 int main(){
-    testParseFile();
-    testParseStr();
-    testCreateXML();
+    // testParseFile();
+    // testParseStr();
+    // testCreateXML();
+    // testTagAndAttribute();
     toString();
-    testTagAndAttribute();
     return 0;
 }
