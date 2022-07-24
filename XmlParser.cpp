@@ -7,17 +7,28 @@
 #include<memory>
 #include<algorithm>
 #include<iterator>
+#include<sstream>
 using namespace std;
 #define ERROR {cout<<"格式错误"<<endl;exit(0);}
 #define CHECK(it) {if(it==end)ERROR;}
 
-typedef map<string,string>& attrRef;
+typedef map<string,string>& attrsRef;
 typedef string::iterator stritera;
 typedef string::const_iterator cstritera;
 
 class XMLParse;
 class XMLTree;
+class XMLNode;
+class XMLReader;
 class PreProcess;
+class XMLBuilder;
+class XML;
+typedef shared_ptr<XMLTree> TreePtr;
+typedef shared_ptr<XMLNode> NodePtr;
+typedef TreePtr Tree;
+typedef NodePtr Node;
+typedef shared_ptr<XML> XMLPtr;
+typedef vector<XMLPtr> ChildrenRef;
 class PreProcess{
     public:
         void delblank(cstritera& sta);
@@ -32,40 +43,38 @@ class PreProcess{
         void processText(string& ret,cstritera& sta,cstritera end);
 };
 class XML{
+    friend class XMLNode;
+    friend class XMLTree;
     public:
         XML(ostream& out):out(out){}
-        virtual void writeMid()=0;
-        virtual void writeMid(const string& blank)=0;
-        virtual void writeBegin();
-        void writeBegin(const string& blank);
-        virtual void writeEnd(const string& blank);
-        void write(const string& blank);
-        void writeEnd();
+        virtual void writeMid(const string& blank,ostream&)=0;
+        virtual void writeBegin(const string& blank,ostream&)=0;
+        virtual void writeEnd(const string& blank,ostream&)=0;
+        void write(const string& blank,ostream& out);
         void write();
-        virtual void showMid()=0;
         string getTagName();
         void setTagName(const string& name);
-        void showBegin();
-        void showEnd();
-        void show();
-        attrRef getAttr();
+        attrsRef getAttr();
         void addAttr(const string& attr,const string& val);
         void copy(shared_ptr<XML> xmlptr);
         virtual void setText(const string& str){}
         virtual void addChild(shared_ptr<XML>){}
+        virtual bool isTree(){return false;}
+        virtual void setOutStream(ostream& ott){
+        }
+        string toString();
     private:
         string tagName;
     protected:
         map<string,string> attributes;
-        ostream& out;
+        ostream& out=cout;
 };
 class XMLNode:public XML{
     public:
         XMLNode(ostream& out):XML(out){}
-        void writeMid();
-        void writeMid(const string& blank);
-        void writeBegin();
-        void showMid();
+        void writeMid(const string& blank,ostream&);
+        void writeBegin(const string& blank,ostream&);
+        void writeEnd(const string& blank,ostream&);
         void setText(const string& text);
     private:
         string text;
@@ -73,22 +82,19 @@ class XMLNode:public XML{
 class XMLTree:public XML{
     public:
         XMLTree(ostream& out):XML(out){}
-        void writeMid();
-        void writeMid(const string& blank);
+        void writeBegin(const string& blank,ostream&);
+        void writeMid(const string& blank,ostream&);
         using XML::writeEnd;
-        void writeEnd(const string& blank);
+        void writeEnd(const string& blank,ostream&);
         void parseStr(const string& str);
         void parseFile(const string& fileName);
-        void showMid();
         void addChild(shared_ptr<XML> xmlptr);
-        void showStr();
-        void writeFile();
+        bool isTree(){return true;}
+        ChildrenRef getChildren();
         ~XMLTree(){
         }
-        vector<shared_ptr<XML>> children;
     private:
-        XMLParse* xmlparse;
-        shared_ptr<XML> pdata;
+        vector<shared_ptr<XML>> children;
 };
 class XMLParse{
     public:
@@ -109,6 +115,19 @@ class XMLParse{
         stack<shared_ptr<XML>> stk;
         shared_ptr<XML> root;
         bool rootFlag=true;
+};
+class XMLReader:public XMLTree{
+    public:
+        XMLReader(ostream& out=cout):XMLTree(out){}
+};
+class XMLBuilder{
+    public:
+        static TreePtr createTree(ostream& out);
+        static TreePtr createTree(const string& tagName,ostream& out);
+        static TreePtr createTree(const string& tagName,vector<vector<string>>& attrs,ostream& out);
+        static NodePtr createNode(ostream& out);
+        static NodePtr createNode(const string& tagName,ostream& out);
+        static NodePtr createNode(const string& tagName,vector<vector<string>>& attrs,ostream& out);
 };
 
 void PreProcess::delblank(cstritera& sta){
@@ -210,59 +229,30 @@ string PreProcess::process(const string& str){
     return ret;
 }
 
-void XML::writeBegin(){
-    out<<"<"+tagName;
-    if(!attributes.empty()){
-        for(auto& it:attributes){
-            out<<" ";
-            out<<it.first+"="+"\""+it.second+"\"";
-        }
-    }
-    out<<">"<<endl;
-}
-void XML::writeBegin(const string& blank){
-    out<<blank;
-    writeBegin();
-}
-void XML::writeEnd(const string& blank){
-    writeEnd();
-}
-void XML::write(const string& blank){
-    writeBegin(blank);
-    writeMid(blank);
-    writeEnd(blank);
-}
-void XML::writeEnd(){
+void XML::writeEnd(const string& blank,ostream& out){
     out<<"</"+tagName+">"<<endl;
 }
+void XML::write(const string& blank,ostream& out){
+    writeBegin(blank,out);
+    writeMid(blank,out);
+    writeEnd(blank,out);
+}
 void XML::write(){
-    write("");
+    write("",out);
 };
+string XML::toString(){
+    stringstream ss;
+    ss.unsetf(ios::skipws);
+    write("",ss);
+    return string(istream_iterator<char>(ss),istream_iterator<char>());
+}
 string XML::getTagName(){
     return tagName;
 };
 void XML::setTagName(const string& name){
     tagName=name;
-};
-void XML::showBegin(){
-    cout<<tagName+":begin"<<endl;
-    if(!attributes.empty()){
-        cout<<"Attributes:";
-        for(auto it:attributes){
-            cout<<it.first+": "+it.second<<"   ";
-        }
-        cout<<endl;
-    }
 }
-void XML::showEnd(){
-    cout<<tagName+":end"<<endl;
-}
-void XML::show(){
-    showBegin();
-    showMid();
-    showEnd();
-}
-attrRef XML::getAttr(){
+attrsRef XML::getAttr(){
     return attributes;
 }
 void XML::addAttr(const string& attr,const string& val){
@@ -273,13 +263,11 @@ void XML::copy(shared_ptr<XML> xmlptr){
     attributes=xmlptr->attributes;
 }
 
-void XMLNode::writeMid(){
+void XMLNode::writeMid(const string& blank,ostream& out){
     out<<text;
 }
-void XMLNode::writeMid(const string& blank){
-    out<<text;
-}
-void XMLNode::writeBegin(){
+void XMLNode::writeBegin(const string& blank,ostream& out){
+    out<<blank;
     out<<"<"+getTagName();
     if(!attributes.empty()){
         for(auto& it:attributes){
@@ -289,31 +277,48 @@ void XMLNode::writeBegin(){
     }
     out<<">";
 }
-void XMLNode::showMid(){
-    cout<<text<<endl;
+void XMLNode::writeEnd(const string& blank,ostream& out){
+    out<<"</"+tagName+">"<<endl;
 }
 void XMLNode::setText(const string& text){
     this->text=text;
 }
 
-void XMLTree::writeMid(){
-    for(auto it:children){
-        it->write();
-    }
+void XMLTree::addChild(shared_ptr<XML> xmlptr){
+    children.push_back(xmlptr);
 }
-void XMLTree::writeMid(const string& blank){
-    for(auto it:children){
-        it->write(blank+"   ");
-    }
+ChildrenRef XMLTree::getChildren(){
+    return children;
 }
-void XMLTree::writeEnd(const string& blank){
+void XMLTree::writeBegin(const string& blank,ostream& out){
     out<<blank;
-    writeEnd();
+    out<<"<"+tagName;
+    if(!attributes.empty()){
+        for(auto& it:attributes){
+            out<<" ";
+            out<<it.first+"="+"\""+it.second+"\"";
+        }
+    }
+    out<<">"<<endl;
+}
+void XMLTree::writeMid(const string& blank,ostream& out){
+    for(auto it:children){
+        it->write(blank+"   ",out);
+    }
+}
+void XMLTree::writeEnd(const string& blank,ostream& out){
+    out<<blank;
+    out<<"</"+tagName+">"<<endl;
 }
 void XMLTree::parseStr(const string& str){
     PreProcess pre;
-    xmlparse=new XMLParse();
-    pdata=xmlparse->parse(pre.process(str),out);
+    auto xmlparse=new XMLParse();
+    auto ptr=xmlparse->parse(pre.process(str),out);
+    attributes=ptr->attributes;
+    tagName=ptr->tagName;
+    if(ptr->isTree()){
+        children=dynamic_pointer_cast<XMLTree>(ptr)->children;
+    }
     delete(xmlparse);
 }
 void XMLTree::parseFile(const string& fileName){
@@ -325,20 +330,6 @@ void XMLTree::parseFile(const string& fileName){
     ifs.unsetf(ios::skipws);
     ::copy(istream_iterator<char>(ifs),istream_iterator<char>(),back_insert_iterator<string>(str));
     parseStr(str);
-}
-void XMLTree::showMid(){
-    for(auto it:children){
-        it->show();
-    }
-}
-void XMLTree::addChild(shared_ptr<XML> xmlptr){
-    children.push_back(xmlptr);
-}
-void XMLTree::showStr(){
-    pdata->show();
-}
-void XMLTree::writeFile(){
-    pdata->write();
 }
 
 void XMLParse::delblank(cstritera& sta){
@@ -481,10 +472,41 @@ void XMLParse::getTagAttr(const string& s,XML& xml){
     } 
 }
 
+TreePtr XMLBuilder::createTree(ostream& out=cout){
+    return TreePtr(new XMLTree(out));
+}
+TreePtr XMLBuilder::createTree(const string& tagName,ostream& out=cout){
+    TreePtr ret(new XMLTree(out));
+    ret->setTagName(tagName);
+    return ret;
+}
+TreePtr XMLBuilder::createTree(const string& tagName,vector<vector<string>>& attrs,ostream& out=cout){
+    TreePtr ret=createTree(tagName,out);
+    for(auto& it:attrs){
+        ret->addAttr(it[0],it[1]);
+    }
+    return ret;
+}
+NodePtr XMLBuilder::createNode(ostream& out=cout){
+    return NodePtr(new XMLNode(out));
+}
+NodePtr XMLBuilder::createNode(const string& tagName,ostream& out=cout){
+    NodePtr ret(new XMLNode(out));
+    ret->setTagName(tagName);
+    return ret;
+}
+NodePtr XMLBuilder::createNode(const string& tagName,vector<vector<string>>& attrs,ostream& out=cout){
+    NodePtr ret=createNode(tagName,out);
+    for(auto& it:attrs){
+        ret->addAttr(it[0],it[1]);
+    }
+    return ret;
+}
+
 int main(){
-    ofstream ofs("C:\\Users\\tomst\\Desktop\\xmlParser\\helo1.xml");
-    XMLTree xml(ofs);
+    XMLReader xml;
     xml.parseFile("C:\\Users\\tomst\\Desktop\\xmlParser\\hello1.xml");
-    xml.writeFile();
+    string ret=xml.toString();
+    cout<<ret<<endl;
     return 0;
 }
